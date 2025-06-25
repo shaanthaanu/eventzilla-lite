@@ -1,0 +1,93 @@
+
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless event ticketing demo (Eventzilla‑Lite)
+
+Globals:
+  Function:
+    Runtime: python3.12
+    Timeout: 10
+    MemorySize: 128
+    Tracing: Active
+
+Resources:
+  EventsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: eventId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: eventId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  BookingsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: bookingId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: bookingId
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  GetEventsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/get_events.lambda_handler
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref EventsTable
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref EventsTable
+      Events:
+        ApiGetEvents:
+          Type: Api
+          Properties:
+            Path: /events
+            Method: get
+
+  CreateEventFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/create_event.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref EventsTable
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref EventsTable
+      Events:
+        ApiCreateEvent:
+          Type: Api
+          Properties:
+            Path: /events
+            Method: post
+
+  BookTicketFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: handlers/book_ticket.lambda_handler
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref BookingsTable
+        - DynamoDBReadPolicy:
+            TableName: !Ref EventsTable
+      Environment:
+        Variables:
+          EVENTS_TABLE: !Ref EventsTable
+          BOOKINGS_TABLE: !Ref BookingsTable
+      Events:
+        ApiBookTicket:
+          Type: Api
+          Properties:
+            Path: /book
+            Method: post
+
+Outputs:
+  ApiUrl:
+    Description: "Prod stage base URL"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod"
